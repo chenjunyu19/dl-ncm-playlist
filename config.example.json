@@ -1,0 +1,21 @@
+{
+    "playlistId": 449008961,
+    "downloadDir": "/home/chenjunyu19/音乐",
+    "downloadSong": true,
+    "downloadLyric": true,
+    "useMd5": true,
+    "extnames": [
+        ".mp3",
+        ".m4a",
+        ".flac"
+    ],
+    "ncmApiPath": "/home/chenjunyu19/文档/NeteaseCloudMusicApi",
+    "mainLogin": {
+        "phone": "",
+        "password": ""
+    },
+    "downloadLogin": {
+        "phone": "",
+        "password": ""
+    }
+}
