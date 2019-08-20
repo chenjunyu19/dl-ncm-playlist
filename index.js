@@ -268,10 +268,13 @@ async function main() {
             const song = array[1];
             const file = path.join(config.downloadDir, song.songName + '.lrc');
             console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(array[0]) + 1, songs.size, path.basename(file));
-            const lrc = (await getJSON(ncmApiHost + '/lyric?id=' + array[0])).lrc.lyric;
-            if (readFileSyncSafe(file) !== lrc) {
-                fs.writeFileSync(file, lrc);
-                console.log('已更新');
+            const lyric = await getJSON(ncmApiHost + '/lyric?id=' + array[0]);
+            if (!lyric.nolyric && !lyric.uncollected && lyric.lrc) {
+                const lrc = lyric.lrc.lyric;
+                if (readFileSyncSafe(file) !== lrc) {
+                    fs.writeFileSync(file, lrc);
+                    console.log('已更新');
+                }
             }
         }
     }
