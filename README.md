@@ -1,6 +1,6 @@
 # dl-ncm-playlist
 
-将网易云音乐播放列表同步到磁盘，支持主辅双帐号和云盘歌曲。特别感谢 [NeteaseCloudMusicApi](https：//github.com/Binaryify/NeteaseCloudMusicApi)。
+将网易云音乐播放列表同步到磁盘，支持主辅双帐号和云盘歌曲。特别感谢 [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)。
 
 ## 特性
 
@@ -13,7 +13,7 @@
 ## 安装
 
 1. 克隆/下载本仓库。
-2. 安装 [Binaryify/NeteaseCloudMusicApi](https：//github.com/Binaryify/NeteaseCloudMusicApi)。
+2. 安装 [Binaryify/NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)。
 3. 复制 `config.example.json` 为 `config.json`。
 4. 编辑 `config.json`，将 `ncmApiPath` 修改为实际位置。
 
