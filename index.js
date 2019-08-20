@@ -1,7 +1,7 @@
 'use strict';
 
-const crypto = require('crypto');
 const cluster = require('cluster');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -16,7 +16,7 @@ function readFileSyncSafe(path) {
 }
 
 function readDirFileSync(path) {
-    let files = [];
+    const files = [];
     for (const file of fs.readdirSync(path, { withFileTypes: true })) {
         if (file.isFile()) {
             files.push(file.name);
@@ -28,13 +28,13 @@ function readDirFileSync(path) {
 function md5sum(path) {
     return new Promise((resolve) => {
         const hash = crypto.createHash('md5');
-        fs.createReadStream(path).pipe(hash);
         hash.on('readable', () => {
             const data = hash.read();
             if (data) {
                 resolve(data.toString('hex'));
             }
         });
+        fs.createReadStream(path).pipe(hash);
     });
 }
 
@@ -63,8 +63,8 @@ function getJSON(url, cookie) {
 function donwloadFile(url, path) {
     return new Promise((resolve) => {
         http.get(url, (res) => {
-            res.pipe(fs.createWriteStream(path));
             res.on('close', resolve);
+            res.pipe(fs.createWriteStream(path));
         });
     });
 }
@@ -74,7 +74,7 @@ function removeExtName(fileName) {
 }
 
 function getSongName(track) {
-    let artist = [];
+    const artist = [];
     for (const ar of track.ar) {
         artist.push(ar.name);
     }
@@ -94,7 +94,7 @@ function logStep(message) {
 
 async function main() {
     logStep('正在读取配置...');
-    let config = JSON.parse(readFileSyncSafe(configFilePath)) || {};
+    const config = JSON.parse(readFileSyncSafe(configFilePath)) || {};
 
     logStep('正在启动 NeteaseCloudMusicApi...');
     const ncmApi = await require(config.ncmApiPath + '/app.js');
@@ -121,21 +121,20 @@ async function main() {
         config.mainCookie = config.downloadCookie;
         needSave = true;
     }
-
     if (needSave) {
         logStep('正在保存配置...');
         fs.writeFileSync(configFilePath, JSON.stringify(config, undefined, 4));
     }
 
     logStep('正在获取歌单数据...');
-    let songs = new Map();
+    const songs = new Map();
     for (const track of (await getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
         songs.set(track.id, { songName: getSongName(track) });
     }
     for (const track of (await getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
         const id = track.songId;
         if (songs.has(id)) {
-            let song = songs.get(id);
+            const song = songs.get(id);
             song.inCloud = true;
             song.fileName = track.fileName;
             song.songName = removeExtName(track.fileName);
@@ -143,7 +142,7 @@ async function main() {
     }
 
     logStep('正在对比本地文件...');
-    let files = readDirFileSync(config.downloadDir);
+    const files = readDirFileSync(config.downloadDir);
     for (const song of songs.values()) {
         let fileName = songs.fileName;
         song.needDownload = true;
@@ -163,9 +162,9 @@ async function main() {
         }
     }
 
-    let md5s = new Map();
+    const md5s = new Map();
     if (config.useMd5 && config.downloadSong) {
-        let filesToSumMd5 = [];
+        const filesToSumMd5 = [];
         for (const file of files) {
             if (config.extnames.includes(path.extname(file))) {
                 filesToSumMd5.push(file);
@@ -203,9 +202,9 @@ async function main() {
 
     if (config.downloadSong) {
         logStep('正在获取下载地址...');
-        let urls = [];
-        let byMain = [];
-        let byDl = [];
+        const urls = [];
+        const byMain = [];
+        const byDl = [];
         for (const array of songs) {
             if (array[1].needDownload) {
                 if (array[1].inCloud) {
@@ -217,7 +216,7 @@ async function main() {
         }
         for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
             if (array[0].length) {
-                urls = urls.concat((await getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
+                urls.push(...(await getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
             }
         }
 
