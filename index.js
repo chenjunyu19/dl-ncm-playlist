@@ -41,9 +41,7 @@ function md5sum(path) {
 function getCookie(url) {
     return new Promise((resolve) => {
         http.get(url, (res) => {
-            if (res.headers["set-cookie"]) {
-                resolve(res.headers["set-cookie"]);
-            }
+            resolve(res.headers["set-cookie"]);
         });
     });
 }
