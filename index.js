@@ -201,8 +201,6 @@ async function main() {
     }
 
     if (config.downloadSong) {
-        logStep('正在获取下载地址...');
-        const urls = [];
         const byMain = [];
         const byDl = [];
         for (const array of songs) {
@@ -214,45 +212,50 @@ async function main() {
                 }
             }
         }
-        for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
-            if (array[0].length) {
-                urls.push(...(await getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
+        if (byMain.length && byDl.length) {
+            logStep('正在获取下载地址...');
+            const urls = [];
+            for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
+                if (array[0].length) {
+                    urls.push(...(await getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
+                }
+            }
+
+            logStep('正在下载缺少歌曲...');
+            for (const url of urls) {
+                const song = songs.get(url.id);
+                const fileName = song.inCloud ? song.fileName : song.songName + '.' + url.type;
+                const file = path.join(config.downloadDir, fileName);
+                const tmpFile = file + '.part';
+                if (md5s.has(url.md5)) {
+                    function rename(oldPath, newPath) {
+                        console.log('(%i/%i) 正在重命名 %s 为 %s', urls.indexOf(url) + 1, urls.length, path.basename(oldPath), path.basename(newPath));
+                        fs.renameSync(oldPath, newPath);
+                    }
+                    const oldFile = md5s.get(url.md5);
+                    rename(oldFile, file);
+                    const oldLrc = removeExtName(oldFile) + '.lrc';
+                    if (fs.existsSync(oldLrc)) {
+                        const lrc = removeExtName(file) + '.lrc';
+                        rename(oldLrc, lrc);
+                    }
+                    md5s.delete(url.md5);
+                } else {
+                    let successful;
+                    do {
+                        console.log('(%i/%i) 正在下载 [%i bit/s] %s', urls.indexOf(url) + 1, urls.length, url.br, path.basename(file));
+                        await donwloadFile(url.url, tmpFile);
+                        if (await md5sum(tmpFile) === url.md5) {
+                            fs.renameSync(tmpFile, file);
+                            successful = true;
+                        } else {
+                            console.error('\u001b[1m\u001b[31m错误：\u001b[0mmd5 不符');
+                        }
+                    } while (!successful)
+                }
             }
         }
 
-        logStep('正在下载缺少歌曲...');
-        for (const url of urls) {
-            const song = songs.get(url.id);
-            const fileName = song.inCloud ? song.fileName : song.songName + '.' + url.type;
-            const file = path.join(config.downloadDir, fileName);
-            const tmpFile = file + '.part';
-            if (md5s.has(url.md5)) {
-                function rename(oldPath, newPath) {
-                    console.log('(%i/%i) 正在重命名 %s 为 %s', urls.indexOf(url) + 1, urls.length, path.basename(oldPath), path.basename(newPath));
-                    fs.renameSync(oldPath, newPath);
-                }
-                const oldFile = md5s.get(url.md5);
-                rename(oldFile, file);
-                const oldLrc = removeExtName(oldFile) + '.lrc';
-                if (fs.existsSync(oldLrc)) {
-                    const lrc = removeExtName(file) + '.lrc';
-                    rename(oldLrc, lrc);
-                }
-                md5s.delete(url.md5);
-            } else {
-                let successful;
-                do {
-                    console.log('(%i/%i) 正在下载 [%i bit/s] %s', urls.indexOf(url) + 1, urls.length, url.br, path.basename(file));
-                    await donwloadFile(url.url, tmpFile);
-                    if (await md5sum(tmpFile) === url.md5) {
-                        fs.renameSync(tmpFile, file);
-                        successful = true;
-                    } else {
-                        console.error('\u001b[1m\u001b[31m错误：\u001b[0mmd5 不符');
-                    }
-                } while (!successful)
-            }
-        }
     } else {
         logStep('正在显示缺少歌曲...');
         for (const song of songs.values()) {
