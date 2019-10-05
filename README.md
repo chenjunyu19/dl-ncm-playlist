@@ -32,6 +32,7 @@ node index.js
 - `downloadLyric`：布尔值。控制是否下载歌词。
 - `useMd5`：布尔值。控制是否使用 md5 识别未知歌曲。
 - `extnames`：字符串数组。指定歌曲文件扩展名。
+- `maps`：数值数组。指定歌曲 ID 的映射关系。
 - `ncmApiPath`：字符串。NeteaseCloudMusicApi 路径。
 - `mainLogin`：主帐号登录信息（可选）。
 - `downloadLogin`：辅助下载帐号登录信息（可选）。
