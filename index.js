@@ -264,11 +264,18 @@ async function main() {
 
     if (config.downloadLyric) {
         logStep('正在更新歌词...');
+        const maps = new Map();
+        if (config.maps) {
+            for (const map of config.maps) {
+                maps.set(map[0], map[1]);
+            }
+        }
         for (const array of songs) {
+            const id = array[0];
             const song = array[1];
             const file = path.join(config.downloadDir, song.songName + '.lrc');
-            console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(array[0]) + 1, songs.size, path.basename(file));
-            const lyric = await getJSON(ncmApiHost + '/lyric?id=' + array[0]);
+            console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(id) + 1, songs.size, path.basename(file));
+            const lyric = await getJSON(ncmApiHost + '/lyric?id=' + (maps.has(id) ? maps.get(id) : id));
             if (!lyric.nolyric && !lyric.uncollected && lyric.lrc) {
                 const lrc = lyric.lrc.lyric;
                 if (readFileSyncSafe(file) !== lrc) {
