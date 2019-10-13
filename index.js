@@ -49,9 +49,9 @@ function getCookie(url) {
 function getJSON(url, cookie) {
     return new Promise((resolve) => {
         http.get(url, { headers: { cookie: cookie ? cookie : '' } }, (res) => {
-            let data = '';
+            let data = Buffer.alloc(0);
             res.on('data', (chunk) => {
-                data += chunk;
+                data = Buffer.concat([data, chunk]);
             });
             res.on('end', () => {
                 resolve(JSON.parse(data));
