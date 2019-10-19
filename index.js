@@ -212,7 +212,7 @@ async function main() {
                 }
             }
         }
-        if (byMain.length && byDl.length) {
+        if (byMain.length || byDl.length) {
             logStep('正在获取下载地址...');
             const urls = [];
             for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
