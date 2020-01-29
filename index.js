@@ -41,7 +41,7 @@ function md5sum(path) {
 function getCookie(url) {
     return new Promise((resolve) => {
         http.get(url, (res) => {
-            resolve(res.headers["set-cookie"]);
+            resolve(res.headers['set-cookie']);
         });
     });
 }
@@ -236,10 +236,10 @@ async function main() {
                 const file = path.join(config.downloadDir, fileName);
                 const tmpFile = file + '.part';
                 if (md5s.has(url.md5)) {
-                    function rename(oldPath, newPath) {
+                    const rename = (oldPath, newPath) => {
                         console.log('(%i/%i) 正在重命名 %s 为 %s', urls.indexOf(url) + 1, urls.length, path.basename(oldPath), path.basename(newPath));
                         fs.renameSync(oldPath, newPath);
-                    }
+                    };
                     const oldFile = md5s.get(url.md5);
                     rename(oldFile, file);
                     const oldLrc = removeExtName(oldFile) + '.lrc';
@@ -259,7 +259,7 @@ async function main() {
                         } else {
                             console.error('\u001b[1m\u001b[31m错误：\u001b[0mmd5 不符');
                         }
-                    } while (!successful)
+                    } while (!successful);
                 }
             }
         }
