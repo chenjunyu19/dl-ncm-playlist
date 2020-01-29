@@ -48,7 +48,7 @@ function getCookie(url) {
 
 function getJSON(url, cookie) {
     return new Promise((resolve) => {
-        http.get(url, { headers: { cookie: cookie ? cookie : '' } }, (res) => {
+        http.get(url, { headers: { cookie: cookie || '' } }, (res) => {
             let data = Buffer.alloc(0);
             res.on('data', (chunk) => {
                 data = Buffer.concat([data, chunk]);
@@ -63,8 +63,9 @@ function getJSON(url, cookie) {
 function donwloadFile(url, path) {
     return new Promise((resolve) => {
         http.get(url, (res) => {
-            res.on('close', resolve);
-            res.pipe(fs.createWriteStream(path));
+            const writeStream = fs.createWriteStream(path);
+            writeStream.on('close', resolve);
+            res.pipe(writeStream);
         });
     });
 }
@@ -78,11 +79,16 @@ function getSongName(track) {
     for (const ar of track.ar) {
         artist.push(ar.name);
     }
-    return replaceSpecialChar(artist.join(',') + ' - ' + track.name);
+    let name = replaceSpecialChar(artist.join(',') + ' - ' + track.name);
+    while (Buffer.from(name).byteLength > 250) {
+        artist.pop();
+        name = replaceSpecialChar(artist.concat(`...(${track.ar.length})`).join(',') + ' - ' + track.name);
+    }
+    return name;
 }
 
 function replaceSpecialChar(string) {
-    for (const char of [['\\', '＼'], ['/', '／'], ['?', '？'], [':', '：'], ['*', '＊'], ['"', '＂'], ['<', '＜'], ['>', '＞'], ['|', '｜']]) {
+    for (const char of [[/\\/g, '＼'], [/\//g, '／'], [/\?/g, '？'], [/:/g, '：'], [/\*/g, '＊'], [/"/g, '＂'], [/</g, '＜'], [/>/g, '＞'], [/\|/g, '｜']]) {
         string = string.replace(char[0], char[1]);
     }
     return string;
@@ -104,13 +110,13 @@ async function main() {
     if (config.mainLogin) {
         logStep('正在登录主帐号...');
         config.mainCookie = await getCookie(ncmApiHost + `/login/cellphone?phone=${config.mainLogin.phone}&password=${config.mainLogin.password}`);
-        config.mainLogin = undefined;
+        delete config.mainLogin;
         needSave = true;
     }
     if (config.downloadLogin) {
         logStep('正在登录辅助下载帐号...');
         config.downloadCookie = await getCookie(ncmApiHost + `/login/cellphone?phone=${config.downloadLogin.phone}&password=${config.downloadLogin.password}`);
-        config.downloadLogin = undefined;
+        delete config.downloadLogin;
         needSave = true;
     }
     if (config.mainCookie && !config.downloadCookie) {
@@ -131,13 +137,15 @@ async function main() {
     for (const track of (await getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
         songs.set(track.id, { songName: getSongName(track) });
     }
-    for (const track of (await getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
-        const id = track.songId;
-        if (songs.has(id)) {
-            const song = songs.get(id);
-            song.inCloud = true;
-            song.fileName = track.fileName;
-            song.songName = removeExtName(track.fileName);
+    if (config.mainCookie) {
+        for (const track of (await getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
+            const id = track.songId;
+            if (songs.has(id)) {
+                const song = songs.get(id);
+                song.inCloud = true;
+                song.fileName = track.fileName;
+                song.songName = removeExtName(track.fileName);
+            }
         }
     }
 
