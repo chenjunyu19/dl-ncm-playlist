@@ -74,13 +74,13 @@ function removeExtName(fileName) {
     return fileName.substring(0, fileName.lastIndexOf('.'));
 }
 
-function getSongName(track) {
+function getSongName(track, maxByteLength) {
     const artist = [];
     for (const ar of track.ar) {
         artist.push(ar.name);
     }
     let name = replaceSpecialChar(artist.join(',') + ' - ' + track.name);
-    while (Buffer.from(name).byteLength > 250) {
+    while (maxByteLength && Buffer.from(name).byteLength > maxByteLength) {
         artist.pop();
         name = replaceSpecialChar(artist.concat(`...(${track.ar.length})`).join(',') + ' - ' + track.name);
     }
@@ -135,7 +135,7 @@ async function main() {
     logStep('正在获取歌单数据...');
     const songs = new Map();
     for (const track of (await getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
-        songs.set(track.id, { songName: getSongName(track) });
+        songs.set(track.id, { songName: getSongName(track, config.maxByteLength) });
     }
     if (config.mainCookie) {
         for (const track of (await getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {

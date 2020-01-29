@@ -4,6 +4,7 @@
     "downloadSong": true,
     "downloadLyric": true,
     "useMd5": true,
+    "maxByteLength": 245,
     "extnames": [
         ".mp3",
         ".m4a",
