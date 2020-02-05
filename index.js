@@ -1,11 +1,11 @@
 'use strict';
 
-const cluster = require('cluster');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
+const worker_threads = require('worker_threads');
 
 const configFilePath = path.join(__dirname, 'config.json');
 
@@ -182,27 +182,27 @@ async function main() {
             logStep('正在计算未知歌曲 md5...');
             await new Promise((resolve) => {
                 const iterator = filesToSumMd5[Symbol.iterator]();
-                function sendNextFileToWorker(worker) {
+                const sendNextFileToWorker = (worker) => {
                     const obj = iterator.next();
                     if (obj.done) {
-                        worker.kill();
+                        worker.terminate();
                     } else {
                         const file = obj.value;
                         console.log('(%i/%i) 正在计算 %s', filesToSumMd5.indexOf(file) + 1, filesToSumMd5.length, file);
-                        worker.send(path.join(config.downloadDir, file));
+                        worker.postMessage(path.join(config.downloadDir, file));
                     }
-                }
-                cluster.on('online', sendNextFileToWorker);
-                cluster.on('message', (worker, message) => {
-                    md5s.set(message.md5, message.file);
-                    if (md5s.size < filesToSumMd5.length) {
-                        sendNextFileToWorker(worker);
-                    } else {
-                        resolve();
-                    }
-                });
+                };
                 for (let i = 0; i < Math.min(filesToSumMd5.length, os.cpus().length); ++i) {
-                    cluster.fork();
+                    const worker = new worker_threads.Worker(__filename);
+                    worker.once('online', () => { sendNextFileToWorker(worker); });
+                    worker.on('message', (value) => {
+                        md5s.set(value.md5, value.file);
+                        if (md5s.size < filesToSumMd5.length) {
+                            sendNextFileToWorker(worker);
+                        } else {
+                            resolve();
+                        }
+                    });
                 }
             });
         }
@@ -311,12 +311,12 @@ async function main() {
     process.exit();
 }
 
-if (cluster.isMaster) {
+if (worker_threads.isMainThread) {
     main();
-} else if (cluster.isWorker) {
-    cluster.worker.on('message', (message) => {
-        md5sum(message).then((md5) => {
-            cluster.worker.send({ file: message, md5: md5 });
+} else {
+    worker_threads.parentPort.on('message', (file) => {
+        md5sum(file).then((md5) => {
+            worker_threads.parentPort.postMessage({ file, md5 });
         });
     });
 }
