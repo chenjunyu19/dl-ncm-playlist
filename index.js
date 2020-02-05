@@ -230,14 +230,16 @@ async function main() {
             }
 
             logStep('正在下载缺少歌曲...');
+            const countTotal = urls.length;
             for (const url of urls) {
+                const countThis = urls.indexOf(url) + 1;
                 const song = songs.get(url.id);
                 const fileName = song.inCloud ? song.fileName : song.songName + '.' + url.type;
                 const file = path.join(config.downloadDir, fileName);
                 const tmpFile = file + '.part';
                 if (md5s.has(url.md5)) {
                     const rename = (oldPath, newPath) => {
-                        console.log('(%i/%i) 正在重命名 %s 为 %s', urls.indexOf(url) + 1, urls.length, path.basename(oldPath), path.basename(newPath));
+                        console.log('(%i/%i) 正在重命名 %s 为 %s', countThis, countTotal, path.basename(oldPath), path.basename(newPath));
                         fs.renameSync(oldPath, newPath);
                     };
                     const oldFile = md5s.get(url.md5);
@@ -250,8 +252,8 @@ async function main() {
                     md5s.delete(url.md5);
                 } else {
                     let successful;
-                    do {
-                        console.log('(%i/%i) 正在下载 [%i bit/s] %s', urls.indexOf(url) + 1, urls.length, url.br, path.basename(file));
+                    while (!successful) {
+                        console.log('(%i/%i) 正在下载 [%i bit/s] %s', countThis, countTotal, url.br, path.basename(file));
                         await donwloadFile(url.url, tmpFile);
                         if (await md5sum(tmpFile) === url.md5) {
                             fs.renameSync(tmpFile, file);
@@ -259,7 +261,7 @@ async function main() {
                         } else {
                             console.error('\u001b[1m\u001b[31m错误：\u001b[0mmd5 不符');
                         }
-                    } while (!successful);
+                    }
                 }
             }
         }
