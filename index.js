@@ -98,6 +98,10 @@ function logStep(message) {
     console.log('\u001b[1m\u001b[34m::\u001b[0m\u001b[1m %s\u001b[0m', message);
 }
 
+function logError(message) {
+    console.log(`\u001b[1m\u001b[31m错误：\u001b[0m${message}`);
+}
+
 async function main() {
     logStep('正在读取配置...');
     const config = JSON.parse(readFileSyncSafe(configFilePath)) || {};
@@ -237,31 +241,35 @@ async function main() {
                 const fileName = song.inCloud ? song.fileName : song.songName + '.' + url.type;
                 const file = path.join(config.downloadDir, fileName);
                 const tmpFile = file + '.part';
-                if (md5s.has(url.md5)) {
-                    const rename = (oldPath, newPath) => {
-                        console.log('(%i/%i) 正在重命名 %s 为 %s', countThis, countTotal, path.basename(oldPath), path.basename(newPath));
-                        fs.renameSync(oldPath, newPath);
-                    };
-                    const oldFile = md5s.get(url.md5);
-                    rename(oldFile, file);
-                    const oldLrc = removeExtName(oldFile) + '.lrc';
-                    if (fs.existsSync(oldLrc)) {
-                        const lrc = removeExtName(file) + '.lrc';
-                        rename(oldLrc, lrc);
-                    }
-                    md5s.delete(url.md5);
-                } else {
-                    let successful;
-                    while (!successful) {
-                        console.log('(%i/%i) 正在下载 [%i bit/s] %s', countThis, countTotal, url.br, path.basename(file));
-                        await donwloadFile(url.url, tmpFile);
-                        if (await md5sum(tmpFile) === url.md5) {
-                            fs.renameSync(tmpFile, file);
-                            successful = true;
-                        } else {
-                            console.error('\u001b[1m\u001b[31m错误：\u001b[0mmd5 不符');
+                if (url.code === 200) {
+                    if (md5s.has(url.md5)) {
+                        const rename = (oldPath, newPath) => {
+                            console.log('(%i/%i) 正在重命名 %s 为 %s', countThis, countTotal, path.basename(oldPath), path.basename(newPath));
+                            fs.renameSync(oldPath, newPath);
+                        };
+                        const oldFile = md5s.get(url.md5);
+                        rename(oldFile, file);
+                        const oldLrc = removeExtName(oldFile) + '.lrc';
+                        if (fs.existsSync(oldLrc)) {
+                            const lrc = removeExtName(file) + '.lrc';
+                            rename(oldLrc, lrc);
+                        }
+                        md5s.delete(url.md5);
+                    } else {
+                        let successful;
+                        while (!successful) {
+                            console.log('(%i/%i) 正在下载 [%i bit/s] %s', countThis, countTotal, url.br, path.basename(file));
+                            await donwloadFile(url.url, tmpFile);
+                            if (await md5sum(tmpFile) === url.md5) {
+                                fs.renameSync(tmpFile, file);
+                                successful = true;
+                            } else {
+                                logError('md5 不符');
+                            }
                         }
                     }
+                } else {
+                    logError(`无法获取 ${song.songName} 的地址，请检查当前登录帐号是否有权限试听该歌曲。`);
                 }
             }
         }
