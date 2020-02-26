@@ -1,125 +1,32 @@
 'use strict';
 
-const crypto = require('crypto');
 const fs = require('fs');
-const http = require('http');
 const os = require('os');
 const path = require('path');
 const worker_threads = require('worker_threads');
 
+const util = require('./util');
+
 const configFilePath = path.join(__dirname, 'config.json');
 
-function readFileSyncSafe(path) {
-    if (fs.existsSync(path)) {
-        return fs.readFileSync(path, { encoding: 'utf-8' });
-    }
-}
-
-function readDirFileSync(path) {
-    const files = [];
-    for (const file of fs.readdirSync(path, { withFileTypes: true })) {
-        if (file.isFile()) {
-            files.push(file.name);
-        }
-    }
-    return files;
-}
-
-function md5sum(path) {
-    return new Promise((resolve) => {
-        const hash = crypto.createHash('md5');
-        hash.on('readable', () => {
-            const data = hash.read();
-            if (data) {
-                resolve(data.toString('hex'));
-            }
-        });
-        fs.createReadStream(path).pipe(hash);
-    });
-}
-
-function getCookie(url) {
-    return new Promise((resolve) => {
-        http.get(url, (res) => {
-            resolve(res.headers['set-cookie']);
-        });
-    });
-}
-
-function getJSON(url, cookie) {
-    return new Promise((resolve) => {
-        http.get(url, { headers: { cookie: cookie || '' } }, (res) => {
-            let data = Buffer.alloc(0);
-            res.on('data', (chunk) => {
-                data = Buffer.concat([data, chunk]);
-            });
-            res.on('end', () => {
-                resolve(JSON.parse(data));
-            });
-        });
-    });
-}
-
-function donwloadFile(url, path) {
-    return new Promise((resolve) => {
-        http.get(url, (res) => {
-            const writeStream = fs.createWriteStream(path);
-            writeStream.on('close', resolve);
-            res.pipe(writeStream);
-        });
-    });
-}
-
-function removeExtName(fileName) {
-    return fileName.substring(0, fileName.lastIndexOf('.'));
-}
-
-function getSongName(track, maxByteLength) {
-    const artist = [];
-    for (const ar of track.ar) {
-        artist.push(ar.name);
-    }
-    let name = replaceSpecialChar(artist.join(',') + ' - ' + track.name);
-    while (maxByteLength && Buffer.from(name).byteLength > maxByteLength) {
-        artist.pop();
-        name = replaceSpecialChar(artist.concat(`...(${track.ar.length})`).join(',') + ' - ' + track.name);
-    }
-    return name;
-}
-
-function replaceSpecialChar(string) {
-    for (const char of [[/\\/g, '＼'], [/\//g, '／'], [/\?/g, '？'], [/:/g, '：'], [/\*/g, '＊'], [/"/g, '＂'], [/</g, '＜'], [/>/g, '＞'], [/\|/g, '｜']]) {
-        string = string.replace(char[0], char[1]);
-    }
-    return string;
-}
-
-function logStep(message) {
-    console.log('\u001b[1m\u001b[34m::\u001b[0m\u001b[1m %s\u001b[0m', message);
-}
-
-function logError(message) {
-    console.log(`\u001b[1m\u001b[31m错误：\u001b[0m${message}`);
-}
-
 async function main() {
-    logStep('正在读取配置...');
-    const config = JSON.parse(readFileSyncSafe(configFilePath)) || {};
+    util.logStep('正在读取配置...');
+    const config = JSON.parse(util.readFileSyncSafe(configFilePath)) || {};
 
-    logStep('正在启动 NeteaseCloudMusicApi...');
+    util.logStep('正在启动 NeteaseCloudMusicApi...');
     const ncmApi = await require(config.ncmApiPath + '/app.js');
     const ncmApiHost = 'http://localhost:' + ncmApi.server.address().port;
 
     let needSave;
     if (config.mainLogin) {
-        logStep('正在登录主帐号...');
-        config.mainCookie = await getCookie(ncmApiHost + `/login/cellphone?phone=${config.mainLogin.phone}&password=${config.mainLogin.password}`);
+        util.logStep('正在登录主帐号...');
+        config.mainCookie = await util.getCookie(ncmApiHost + `/login/cellphone?phone=${config.mainLogin.phone}&password=${config.mainLogin.password}`);
         delete config.mainLogin;
         needSave = true;
     }
     if (config.downloadLogin) {
-        logStep('正在登录辅助下载帐号...');
-        config.downloadCookie = await getCookie(ncmApiHost + `/login/cellphone?phone=${config.downloadLogin.phone}&password=${config.downloadLogin.password}`);
+        util.logStep('正在登录辅助下载帐号...');
+        config.downloadCookie = await util.getCookie(ncmApiHost + `/login/cellphone?phone=${config.downloadLogin.phone}&password=${config.downloadLogin.password}`);
         delete config.downloadLogin;
         needSave = true;
     }
@@ -132,29 +39,29 @@ async function main() {
         needSave = true;
     }
     if (needSave) {
-        logStep('正在保存配置...');
+        util.logStep('正在保存配置...');
         fs.writeFileSync(configFilePath, JSON.stringify(config, undefined, 4));
     }
 
-    logStep('正在获取歌单数据...');
+    util.logStep('正在获取歌单数据...');
     const songs = new Map();
-    for (const track of (await getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
-        songs.set(track.id, { songName: getSongName(track, config.maxByteLength) });
+    for (const track of (await util.getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
+        songs.set(track.id, { songName: util.getSongName(track, config.maxByteLength) });
     }
     if (config.mainCookie) {
-        for (const track of (await getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
+        for (const track of (await util.getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
             const id = track.songId;
             if (songs.has(id)) {
                 const song = songs.get(id);
                 song.inCloud = true;
                 song.fileName = track.fileName;
-                song.songName = removeExtName(track.fileName);
+                song.songName = util.removeExtName(track.fileName);
             }
         }
     }
 
-    logStep('正在对比本地文件...');
-    const files = readDirFileSync(config.downloadDir);
+    util.logStep('正在对比本地文件...');
+    const files = util.readDirFileSync(config.downloadDir);
     for (const song of songs.values()) {
         let fileName = songs.fileName;
         song.needDownload = true;
@@ -183,7 +90,7 @@ async function main() {
             }
         }
         if (filesToSumMd5.length) {
-            logStep('正在计算未知歌曲 md5...');
+            util.logStep('正在计算未知歌曲 md5...');
             await new Promise((resolve) => {
                 const iterator = filesToSumMd5[Symbol.iterator]();
                 const sendNextFileToWorker = (worker) => {
@@ -197,7 +104,7 @@ async function main() {
                     }
                 };
                 for (let i = 0; i < Math.min(filesToSumMd5.length, os.cpus().length); ++i) {
-                    const worker = new worker_threads.Worker(__filename);
+                    const worker = new worker_threads.Worker(path.join(__dirname, 'md5sum_worker.js'));
                     worker.once('online', () => { sendNextFileToWorker(worker); });
                     worker.on('message', (value) => {
                         md5s.set(value.md5, value.file);
@@ -225,15 +132,15 @@ async function main() {
             }
         }
         if (byMain.length || byDl.length) {
-            logStep('正在获取下载地址...');
+            util.logStep('正在获取下载地址...');
             const urls = [];
             for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
                 if (array[0].length) {
-                    urls.push(...(await getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
+                    urls.push(...(await util.getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
                 }
             }
 
-            logStep('正在下载缺少歌曲...');
+            util.logStep('正在下载缺少歌曲...');
             const countTotal = urls.length;
             for (const url of urls) {
                 const countThis = urls.indexOf(url) + 1;
@@ -249,9 +156,9 @@ async function main() {
                         };
                         const oldFile = md5s.get(url.md5);
                         rename(oldFile, file);
-                        const oldLrc = removeExtName(oldFile) + '.lrc';
+                        const oldLrc = util.removeExtName(oldFile) + '.lrc';
                         if (fs.existsSync(oldLrc)) {
-                            const lrc = removeExtName(file) + '.lrc';
+                            const lrc = util.removeExtName(file) + '.lrc';
                             rename(oldLrc, lrc);
                         }
                         md5s.delete(url.md5);
@@ -259,23 +166,23 @@ async function main() {
                         let successful;
                         while (!successful) {
                             console.log('(%i/%i) 正在下载 [%i bit/s] %s', countThis, countTotal, url.br, path.basename(file));
-                            await donwloadFile(url.url, tmpFile);
-                            if (await md5sum(tmpFile) === url.md5) {
+                            await util.donwloadFile(url.url, tmpFile);
+                            if (await util.md5sum(tmpFile) === url.md5) {
                                 fs.renameSync(tmpFile, file);
                                 successful = true;
                             } else {
-                                logError('md5 不符');
+                                util.logError('md5 不符');
                             }
                         }
                     }
                 } else {
-                    logError(`无法获取 ${song.songName} 的地址，请检查当前登录帐号是否有权限试听该歌曲。`);
+                    util.logError(`无法获取 ${song.songName} 的地址，请检查当前登录帐号是否有权限试听该歌曲。`);
                 }
             }
         }
 
     } else {
-        logStep('正在显示缺少歌曲...');
+        util.logStep('正在显示缺少歌曲...');
         for (const song of songs.values()) {
             if (song.needDownload) {
                 console.log(song.songName);
@@ -284,7 +191,7 @@ async function main() {
     }
 
     if (config.downloadLyric) {
-        logStep('正在更新歌词...');
+        util.logStep('正在更新歌词...');
         const maps = new Map();
         if (config.maps) {
             for (const map of config.maps) {
@@ -296,10 +203,10 @@ async function main() {
             const song = array[1];
             const file = path.join(config.downloadDir, song.songName + '.lrc');
             console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(id) + 1, songs.size, path.basename(file));
-            const lyric = await getJSON(ncmApiHost + '/lyric?id=' + (maps.has(id) ? maps.get(id) : id));
+            const lyric = await util.getJSON(ncmApiHost + '/lyric?id=' + (maps.has(id) ? maps.get(id) : id));
             if (!lyric.nolyric && !lyric.uncollected && lyric.lrc) {
                 const lrc = lyric.lrc.lyric;
-                if (readFileSyncSafe(file) !== lrc) {
+                if (util.readFileSyncSafe(file) !== lrc) {
                     fs.writeFileSync(file, lrc);
                     console.log('已更新');
                 }
@@ -308,23 +215,15 @@ async function main() {
     }
 
     if (md5s.size) {
-        logStep('正在输出遗留歌曲文件...');
+        util.logStep('正在输出遗留歌曲文件...');
         for (const file of md5s.values()) {
             console.log(path.basename(file));
         }
     }
 
-    logStep('正在退出...');
+    util.logStep('正在退出...');
     ncmApi.server.close();
     process.exit();
 }
 
-if (worker_threads.isMainThread) {
-    main();
-} else {
-    worker_threads.parentPort.on('message', (file) => {
-        md5sum(file).then((md5) => {
-            worker_threads.parentPort.postMessage({ file, md5 });
-        });
-    });
-}
+main();
