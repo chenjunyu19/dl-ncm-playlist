@@ -46,7 +46,7 @@ async function main() {
     util.logStep('正在获取歌单数据...');
     const songs = new Map();
     for (const track of (await util.getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
-        songs.set(track.id, { songName: util.getSongName(track, config.maxByteLength) });
+        songs.set(track.id, { id: track.id, songName: util.getSongName(track, config.maxByteLength) });
     }
     if (config.mainCookie) {
         for (const track of (await util.getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
@@ -61,30 +61,30 @@ async function main() {
     }
 
     util.logStep('正在对比本地文件...');
-    const files = util.readDirFileSync(config.downloadDir);
+    const unkownFiles = util.readDirFileSync(config.downloadDir);
     for (const song of songs.values()) {
         let fileName = songs.fileName;
         song.needDownload = true;
         if (fileName) {
-            song.needDownload = files.includes(fileName);
+            song.needDownload = unkownFiles.includes(fileName);
         } else {
             for (const extname of config.extnames) {
                 fileName = song.songName + extname;
-                if (files.includes(fileName)) {
+                if (unkownFiles.includes(fileName)) {
                     song.needDownload = false;
                     break;
                 }
             }
         }
         if (!song.needDownload) {
-            files.splice(files.indexOf(fileName), 1);
+            unkownFiles.splice(unkownFiles.indexOf(fileName), 1);
         }
     }
 
     const md5s = new Map();
     if (config.useMd5 && config.downloadSong) {
         const filesToSumMd5 = [];
-        for (const file of files) {
+        for (const file of unkownFiles) {
             if (config.extnames.includes(path.extname(file))) {
                 filesToSumMd5.push(file);
             }
@@ -122,12 +122,12 @@ async function main() {
     if (config.downloadSong) {
         const byMain = [];
         const byDl = [];
-        for (const array of songs) {
-            if (array[1].needDownload) {
-                if (array[1].inCloud) {
-                    byMain.push(array[0]);
+        for (const song of songs.values()) {
+            if (song.needDownload) {
+                if (song.inCloud) {
+                    byMain.push(song.id);
                 } else {
-                    byDl.push(array[0]);
+                    byDl.push(song.id);
                 }
             }
         }
@@ -192,18 +192,11 @@ async function main() {
 
     if (config.downloadLyric) {
         util.logStep('正在更新歌词...');
-        const maps = new Map();
-        if (config.maps) {
-            for (const map of config.maps) {
-                maps.set(map[0], map[1]);
-            }
-        }
-        for (const array of songs) {
-            const id = array[0];
-            const song = array[1];
+        const maps = new Map(config.maps);
+        for (const song of songs.values()) {
             const file = path.join(config.downloadDir, song.songName + '.lrc');
-            console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(id) + 1, songs.size, path.basename(file));
-            const lyric = await util.getJSON(ncmApiHost + '/lyric?id=' + (maps.has(id) ? maps.get(id) : id));
+            console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(song.id) + 1, songs.size, path.basename(file));
+            const lyric = await util.getJSON(ncmApiHost + '/lyric?id=' + (maps.get(song.id) || song.id));
             if (!lyric.nolyric && !lyric.uncollected && lyric.lrc) {
                 const lrc = lyric.lrc.lyric;
                 if (util.readFileSyncSafe(file) !== lrc) {
