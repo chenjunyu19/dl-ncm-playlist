@@ -13,22 +13,18 @@ async function main() {
     util.logStep('正在读取配置...');
     const config = JSON.parse(util.readFileSyncSafe(configFilePath)) || {};
 
-    util.logStep('正在启动 NeteaseCloudMusicApi...');
-    const ncmApi = await require(config.ncmApiPath + '/app.js');
-    const ncmApiHost = 'http://localhost:' + ncmApi.server.address().port;
+    util.logStep('正在加载 NeteaseCloudMusicApi...');
+    const { login_cellphone, playlist_detail, user_cloud, song_url, lyric } = require(path.join(config.ncmApiPath, 'main.js'));
 
     let needSave;
-    if (config.mainLogin) {
-        util.logStep('正在登录主帐号...');
-        config.mainCookie = await util.getCookie(ncmApiHost + `/login/cellphone?phone=${config.mainLogin.phone}&password=${config.mainLogin.password}`);
-        delete config.mainLogin;
-        needSave = true;
-    }
-    if (config.downloadLogin) {
-        util.logStep('正在登录辅助下载帐号...');
-        config.downloadCookie = await util.getCookie(ncmApiHost + `/login/cellphone?phone=${config.downloadLogin.phone}&password=${config.downloadLogin.password}`);
-        delete config.downloadLogin;
-        needSave = true;
+    for (const type of [{ name: 'main', description: '主' }, { name: 'download', description: '辅助下载' }]) {
+        if (config[type.name + 'Login']) {
+            util.logStep(`正在登录${type.description}帐号...`);
+            const result = await login_cellphone({ phone: config[type.name + 'Login'].phone, password: config[type.name + 'Login'].password });
+            config[type.name + 'Cookie'] = result.body.cookie;
+            delete config[type.name + 'Login'];
+            needSave = true;
+        }
     }
     if (config.mainCookie && !config.downloadCookie) {
         config.downloadCookie = config.mainCookie;
@@ -45,11 +41,11 @@ async function main() {
 
     util.logStep('正在获取歌单数据...');
     const songs = new Map();
-    for (const track of (await util.getJSON(ncmApiHost + '/playlist/detail?id=' + config.playlistId, config.mainCookie)).playlist.tracks) {
+    for (const track of (await playlist_detail({ id: config.playlistId, cookie: config.mainCookie })).body.playlist.tracks) {
         songs.set(track.id, { id: track.id, songName: util.getSongName(track, config.maxByteLength) });
     }
     if (config.mainCookie) {
-        for (const track of (await util.getJSON(ncmApiHost + '/user/cloud', config.mainCookie)).data) {
+        for (const track of (await user_cloud({ cookie: config.mainCookie })).body.data) {
             const id = track.songId;
             if (songs.has(id)) {
                 const song = songs.get(id);
@@ -136,7 +132,7 @@ async function main() {
             const urls = [];
             for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
                 if (array[0].length) {
-                    urls.push(...(await util.getJSON(ncmApiHost + '/song/url?id=' + array[0].join(','), array[1])).data);
+                    urls.push(...(await song_url({ id: array[0].join(','), cookie: array[1] })).body.data);
                 }
             }
 
@@ -196,9 +192,9 @@ async function main() {
         for (const song of songs.values()) {
             const file = path.join(config.downloadDir, song.songName + '.lrc');
             console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(song.id) + 1, songs.size, path.basename(file));
-            const lyric = await util.getJSON(ncmApiHost + '/lyric?id=' + (maps.get(song.id) || song.id));
-            if (!lyric.nolyric && !lyric.uncollected && lyric.lrc) {
-                const lrc = lyric.lrc.lyric;
+            const lyricResult = (await lyric({ id: maps.get(song.id) || song.id })).body;
+            if (!lyricResult.nolyric && !lyricResult.uncollected && lyricResult.lrc) {
+                const lrc = lyricResult.lrc.lyric;
                 if (util.readFileSyncSafe(file) !== lrc) {
                     fs.writeFileSync(file, lrc);
                     console.log('已更新');
@@ -215,7 +211,6 @@ async function main() {
     }
 
     util.logStep('正在退出...');
-    ncmApi.server.close();
     process.exit();
 }
 
