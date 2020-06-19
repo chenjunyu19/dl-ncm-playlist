@@ -34,28 +34,6 @@ module.exports = {
         });
     },
 
-    getCookie(url) {
-        return new Promise((resolve) => {
-            http.get(url, (res) => {
-                resolve(res.headers['set-cookie']);
-            });
-        });
-    },
-
-    getJSON(url, cookie) {
-        return new Promise((resolve) => {
-            http.get(url, { headers: { cookie: cookie || '' } }, (res) => {
-                let data = Buffer.alloc(0);
-                res.on('data', (chunk) => {
-                    data = Buffer.concat([data, chunk]);
-                });
-                res.on('end', () => {
-                    resolve(JSON.parse(data));
-                });
-            });
-        });
-    },
-
     donwloadFile(url, path) {
         return new Promise((resolve) => {
             http.get(url, (res) => {
