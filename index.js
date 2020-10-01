@@ -1,6 +1,6 @@
 'use strict';
 
-const fs = require('fs');
+const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
 const worker_threads = require('worker_threads');
@@ -11,7 +11,7 @@ const configFilePath = path.join(__dirname, 'config.json');
 
 async function main() {
     util.logStep('正在读取配置...');
-    const config = JSON.parse(util.readFileSyncSafe(configFilePath)) || {};
+    const config = JSON.parse(await util.readFileSafe(configFilePath)) || {};
 
     util.logStep('正在加载 NeteaseCloudMusicApi...');
     const { login_cellphone, playlist_detail, user_cloud, song_url, lyric } = require(path.join(config.ncmApiPath, 'main.js'));
@@ -36,7 +36,7 @@ async function main() {
     }
     if (needSave) {
         util.logStep('正在保存配置...');
-        fs.writeFileSync(configFilePath, JSON.stringify(config, undefined, 4));
+        await fs.writeFile(configFilePath, JSON.stringify(config, undefined, 4));
     }
 
     util.logStep('正在获取歌单数据...');
@@ -57,7 +57,7 @@ async function main() {
     }
 
     util.logStep('正在对比本地文件...');
-    const unkownFiles = util.readDirFileSync(config.downloadDir);
+    const unkownFiles = await util.readDirFile(config.downloadDir);
     for (const song of songs.values()) {
         let fileName = songs.fileName;
         song.needDownload = true;
@@ -146,16 +146,16 @@ async function main() {
                 const tmpFile = file + '.part';
                 if (url.code === 200) {
                     if (md5s.has(url.md5)) {
-                        const rename = (oldPath, newPath) => {
+                        const rename = async (oldPath, newPath) => {
                             console.log('(%i/%i) 正在重命名 %s 为 %s', countThis, countTotal, path.basename(oldPath), path.basename(newPath));
-                            fs.renameSync(oldPath, newPath);
+                            await fs.rename(oldPath, newPath);
                         };
                         const oldFile = md5s.get(url.md5);
-                        rename(oldFile, file);
+                        await rename(oldFile, file);
                         const oldLrc = util.removeExtName(oldFile) + '.lrc';
-                        if (fs.existsSync(oldLrc)) {
+                        if (await fs.exists(oldLrc)) {
                             const lrc = util.removeExtName(file) + '.lrc';
-                            rename(oldLrc, lrc);
+                            await rename(oldLrc, lrc);
                         }
                         md5s.delete(url.md5);
                     } else {
@@ -164,7 +164,7 @@ async function main() {
                             console.log('(%i/%i) 正在下载 [%i bit/s] %s', countThis, countTotal, url.br, path.basename(file));
                             await util.donwloadFile(url.url, tmpFile);
                             if (await util.md5sum(tmpFile) === url.md5) {
-                                fs.renameSync(tmpFile, file);
+                                await fs.rename(tmpFile, file);
                                 successful = true;
                             } else {
                                 util.logError('md5 不符');
@@ -194,9 +194,7 @@ async function main() {
             console.log('(%i/%i) 正在检查 %s', Array.from(songs.keys()).indexOf(song.id) + 1, songs.size, path.basename(file));
             const lyricResult = (await lyric({ id: maps.get(song.id) || song.id })).body;
             if (!lyricResult.nolyric && !lyricResult.uncollected && lyricResult.lrc) {
-                const lrc = lyricResult.lrc.lyric;
-                if (util.readFileSyncSafe(file) !== lrc) {
-                    fs.writeFileSync(file, lrc);
+                if (await util.writeFileIfNecessary(file, lyricResult.lrc.lyric)) {
                     console.log('已更新');
                 }
             }

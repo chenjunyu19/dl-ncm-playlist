@@ -5,20 +5,31 @@ const fs = require('fs');
 const http = require('http');
 
 module.exports = {
-    readFileSyncSafe(path) {
-        if (fs.existsSync(path)) {
-            return fs.readFileSync(path, { encoding: 'utf-8' });
+    async readFileSafe(path) {
+        try {
+            return await fs.promises.readFile(path, { encoding: 'utf-8' });
+        } catch (err) {
+            return;
         }
     },
 
-    readDirFileSync(path) {
+    async readDirFile(path) {
         const files = [];
-        for (const file of fs.readdirSync(path, { withFileTypes: true })) {
+        for (const file of await fs.promises.readdir(path, { withFileTypes: true })) {
             if (file.isFile()) {
                 files.push(file.name);
             }
         }
         return files;
+    },
+
+    async writeFileIfNecessary(path, data) {
+        if (await this.readFileSafe(path) !== data) {
+            await fs.promises.writeFile(path, data);
+            return true;
+        } else {
+            return false;
+        }
     },
 
     md5sum(path) {
