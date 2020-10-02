@@ -41,7 +41,8 @@ async function main() {
 
     util.logStep('正在获取歌单数据...');
     const songs = new Map();
-    for (const track of (await playlist_detail({ id: config.playlistId, cookie: config.mainCookie })).body.playlist.tracks) {
+    const playlistDetail = await playlist_detail({ id: config.playlistId, cookie: config.mainCookie });
+    for (const track of playlistDetail.body.playlist.tracks) {
         songs.set(track.id, { id: track.id, songName: util.getSongName(track, config.maxByteLength) });
     }
     if (config.mainCookie) {
@@ -67,6 +68,7 @@ async function main() {
             for (const extname of config.extnames) {
                 fileName = song.songName + extname;
                 if (unkownFiles.includes(fileName)) {
+                    song.fileName = fileName;
                     song.needDownload = false;
                     break;
                 }
@@ -141,8 +143,10 @@ async function main() {
             for (const url of urls) {
                 const countThis = urls.indexOf(url) + 1;
                 const song = songs.get(url.id);
-                const fileName = song.inCloud ? song.fileName : song.songName + '.' + url.type;
-                const file = path.join(config.downloadDir, fileName);
+                if (!song.inCloud) {
+                    song.fileName = song.songName + '.' + url.type;
+                }
+                const file = path.join(config.downloadDir, song.fileName);
                 const tmpFile = file + '.part';
                 if (url.code === 200) {
                     if (md5s.has(url.md5)) {
@@ -198,6 +202,17 @@ async function main() {
                     console.log('已更新');
                 }
             }
+        }
+    }
+
+    if (config.saveM3U) {
+        util.logStep('正在更新 M3U 播放列表...');
+        const fileNames = [];
+        for (const song of songs.values()) {
+            fileNames.push(song.fileName);
+        }
+        if (await util.writeFileIfNecessary(path.join(config.downloadDir, `! ${playlistDetail.body.playlist.name}.m3u`), fileNames.join('\n'))) {
+            console.log('已更新');
         }
     }
 

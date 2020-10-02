@@ -3,6 +3,7 @@
     "downloadDir": "/home/chenjunyu19/音乐",
     "downloadSong": true,
     "downloadLyric": true,
+    "saveM3U": true,
     "useMd5": true,
     "maxByteLength": 245,
     "extnames": [
