@@ -59,10 +59,10 @@ async function main() {
     util.logStep('正在对比本地文件...');
     const unkownFiles = await util.readDirFile(config.downloadDir);
     for (const song of songs.values()) {
-        let fileName = songs.fileName;
+        let fileName = song.fileName;
         song.needDownload = true;
         if (fileName) {
-            song.needDownload = unkownFiles.includes(fileName);
+            song.needDownload = !unkownFiles.includes(fileName);
         } else {
             for (const extname of config.extnames) {
                 fileName = song.songName + extname;
