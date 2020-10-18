@@ -59,15 +59,15 @@ module.exports = {
         return fileName.substring(0, fileName.lastIndexOf('.'));
     },
 
-    getSongName(track, maxByteLength) {
+    getSongName(track, maxByteLength, separator) {
         const artist = [];
         for (const ar of track.ar) {
             artist.push(ar.name);
         }
-        let name = this.replaceSpecialChar(artist.join(',') + ' - ' + track.name);
+        let name = this.replaceSpecialChar(artist.join(separator) + ' - ' + track.name);
         while (maxByteLength && Buffer.from(name).byteLength > maxByteLength) {
             artist.pop();
-            name = this.replaceSpecialChar(artist.concat(`...(${track.ar.length})`).join(',') + ' - ' + track.name);
+            name = this.replaceSpecialChar(artist.concat(`...(${track.ar.length})`).join(separator) + ' - ' + track.name);
         }
         return name;
     },

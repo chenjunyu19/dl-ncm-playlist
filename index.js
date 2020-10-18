@@ -43,7 +43,7 @@ async function main() {
     const songs = new Map();
     const playlistDetail = await playlist_detail({ id: config.playlistId, cookie: config.mainCookie });
     for (const track of playlistDetail.body.playlist.tracks) {
-        songs.set(track.id, { id: track.id, songName: util.getSongName(track, config.maxByteLength) });
+        songs.set(track.id, { id: track.id, songName: util.getSongName(track, config.maxByteLength, config.separator) });
     }
     if (config.mainCookie) {
         for (const track of (await user_cloud({ cookie: config.mainCookie })).body.data) {

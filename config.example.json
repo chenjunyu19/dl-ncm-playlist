@@ -5,6 +5,7 @@
     "downloadLyric": true,
     "saveM3U": true,
     "useMd5": true,
+    "separator": ",",
     "maxByteLength": 245,
     "extnames": [
         ".mp3",
