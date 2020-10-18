@@ -83,6 +83,10 @@ module.exports = {
         console.log('\u001b[1m\u001b[34m::\u001b[0m\u001b[1m %s\u001b[0m', message);
     },
 
+    logWarn(message) {
+        console.log(`\u001b[1m\u001b[33m警告：\u001b[0m${message}`);
+    },
+
     logError(message) {
         console.log(`\u001b[1m\u001b[31m错误：\u001b[0m${message}`);
     },

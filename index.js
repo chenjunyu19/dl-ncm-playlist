@@ -156,10 +156,10 @@ async function main() {
                         };
                         const oldFile = md5s.get(url.md5);
                         await rename(oldFile, file);
-                        const oldLrc = util.removeExtName(oldFile) + '.lrc';
-                        if (await fs.exists(oldLrc)) {
-                            const lrc = util.removeExtName(file) + '.lrc';
-                            await rename(oldLrc, lrc);
+                        try {
+                            await rename(util.removeExtName(oldFile) + '.lrc', util.removeExtName(file) + '.lrc');
+                        } catch (error) {
+                            util.logWarn('重命名时发生了错误');
                         }
                         md5s.delete(url.md5);
                     } else {
