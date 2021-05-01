@@ -134,7 +134,7 @@ async function main() {
             const urls = [];
             for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
                 if (array[0].length) {
-                    urls.push(...(await song_url({ id: array[0].join(','), cookie: array[1] })).body.data);
+                    urls.push(...JSON.parse((await song_url({ id: array[0].join(','), cookie: array[1] })).body).data);
                 }
             }
 
