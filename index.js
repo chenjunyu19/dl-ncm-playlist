@@ -14,7 +14,7 @@ async function main() {
     const config = JSON.parse(await util.readFileSafe(configFilePath)) || {};
 
     util.logStep('正在加载 NeteaseCloudMusicApi...');
-    const { login_cellphone, playlist_detail, user_cloud, song_url, lyric } = require(path.join(config.ncmApiPath, 'main.js'));
+    const { login_cellphone, playlist_detail, user_cloud, song_download_url, lyric } = require(path.join(config.ncmApiPath, 'main.js'));
 
     let needSave;
     for (const type of [{ name: 'main', description: '主' }, { name: 'download', description: '辅助下载' }]) {
@@ -59,6 +59,7 @@ async function main() {
 
     util.logStep('正在对比本地文件...');
     const unkownFiles = await util.readDirFile(config.downloadDir);
+    const toDl = [];
     for (const song of songs.values()) {
         let fileName = song.fileName;
         song.needDownload = true;
@@ -74,7 +75,9 @@ async function main() {
                 }
             }
         }
-        if (!song.needDownload) {
+        if (song.needDownload) {
+            toDl.push(song);
+        } else {
             unkownFiles.splice(unkownFiles.indexOf(fileName), 1);
         }
     }
@@ -118,31 +121,14 @@ async function main() {
     }
 
     if (config.downloadSong) {
-        const byMain = [];
-        const byDl = [];
-        for (const song of songs.values()) {
-            if (song.needDownload) {
-                if (song.inCloud) {
-                    byMain.push(song.id);
-                } else {
-                    byDl.push(song.id);
-                }
-            }
-        }
-        if (byMain.length || byDl.length) {
-            util.logStep('正在获取下载地址...');
-            const urls = [];
-            for (const array of [[byMain, config.mainCookie], [byDl, config.downloadCookie]]) {
-                if (array[0].length) {
-                    urls.push(...(await song_url({ id: array[0].join(','), cookie: array[1] })).body.data);
-                }
-            }
-
+        if (toDl.length) {
             util.logStep('正在下载缺少歌曲...');
-            const countTotal = urls.length;
-            for (const url of urls) {
-                const countThis = urls.indexOf(url) + 1;
-                const song = songs.get(url.id);
+            const countTotal = toDl.length;
+            let countThis = 0;
+            for (const song of toDl) {
+                ++countThis;
+                const res = await song_download_url({ id: song.id, cookie: song.inCloud ? config.mainCookie : config.downloadCookie });
+                const url = (res).body.data;
                 if (!song.inCloud) {
                     song.fileName = song.songName + '.' + url.type;
                 }
@@ -176,17 +162,15 @@ async function main() {
                         }
                     }
                 } else {
-                    util.logError(`无法获取 ${song.songName} 的地址，请检查当前登录帐号是否有权限试听该歌曲。`);
+                    util.logError(`无法获取 ${song.songName} 的地址，请检查当前登录帐号是否有权限下载该歌曲。`);
                 }
             }
         }
 
     } else {
         util.logStep('正在显示缺少歌曲...');
-        for (const song of songs.values()) {
-            if (song.needDownload) {
-                console.log(song.songName);
-            }
+        for (const song of toDl) {
+            console.log(song.songName);
         }
     }
 
